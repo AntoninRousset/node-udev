@@ -30,42 +30,25 @@ Monitor::Monitor(const Napi::CallbackInfo &info)
   fd_ = udev_monitor_get_fd(mon_);
   poll_handle_ = new uv_poll_t;
 
-  std::vector<std::string> subsystem_filters = {};
-  std::vector<std::string> tag_filters = {};
   if (info[0].IsString()) {
     Napi::String subsystem = info[0].ToString();
-    subsystem_filters.push_back(subsystem.Utf8Value());
+    add_subsystem_filter(subsystem.Utf8Value().c_str(), env);
   } else if (info[0].IsObject()) {
     Napi::Object filters = info[0].ToObject();
     if (filters.Has("subsystems")) {
       Napi::Array subsystems = filters.Get("subsystems").As<Napi::Array>();
       for (uint32_t i = 0; i < subsystems.Length(); i++) {
-        subsystem_filters.push_back(
-            static_cast<Napi::Value>(subsystems[i]).ToString().Utf8Value());
+        Napi::String subsystem = static_cast<Napi::Value>(subsystems[i])
+          .ToString();
+        add_subsystem_filter(subsystem.Utf8Value().c_str(), env);
       }
     }
     if (filters.Has("tags")) {
       Napi::Array tags = filters.Get("tags").As<Napi::Array>();
       for (uint32_t i = 0; i < tags.Length(); i++) {
-        tag_filters.push_back(
-            static_cast<Napi::Value>(tags[i]).ToString().Utf8Value());
+        Napi::String tag = static_cast<Napi::Value>(tags[i]).ToString();
+        add_tag_filter(tag.Utf8Value().c_str(), env);
       }
-    }
-  }
-
-  for (std::string subsystem_filter : subsystem_filters) {
-    int r = udev_monitor_filter_add_match_subsystem_devtype(
-        mon_, subsystem_filter.c_str(), NULL);
-    if (r < 0) {
-      Napi::Error::New(env, "adding subsystem filter failed")
-          .ThrowAsJavaScriptException();
-    }
-  }
-  for (std::string tag_filter : tag_filters) {
-    int r = udev_monitor_filter_add_match_tag(mon_, tag_filter.c_str());
-    if (r < 0) {
-      Napi::Error::New(env, "adding tag filter failed")
-          .ThrowAsJavaScriptException();
     }
   }
 
@@ -82,6 +65,23 @@ Monitor::~Monitor() {
   uv_close((uv_handle_t *)poll_handle_, on_handle_close);
   udev_monitor_unref(mon_);
   udev_unref(instance_);
+}
+
+void Monitor::add_subsystem_filter(const char *subsystem, Napi::Env &env) {
+  int r = udev_monitor_filter_add_match_subsystem_devtype(
+    mon_, subsystem, NULL);
+  if (r < 0) {
+    Napi::Error::New(env, "adding subsystem filter failed")
+        .ThrowAsJavaScriptException();
+  }
+}
+
+void Monitor::add_tag_filter(const char *tag, Napi::Env &env) {
+  int r = udev_monitor_filter_add_match_tag(mon_, tag);
+  if (r < 0) {
+    Napi::Error::New(env, "adding tag filter failed")
+        .ThrowAsJavaScriptException();
+  }
 }
 
 void Monitor::on_handle_event(uv_poll_t *handle, int status, int events) {
@@ -152,6 +152,24 @@ void PushProperties(Napi::Env &env, Napi::Object obj, struct udev_device *dev) {
   }
 }
 
+void add_subsystem_filter(
+    udev_enumerate_ptr &enumerate, const char *subsystem, Napi::Env &env) {
+  int r = udev_enumerate_add_match_subsystem(enumerate.get(), subsystem);
+  if (r < 0) {
+    Napi::Error::New(env, "adding subsystem filter failed")
+        .ThrowAsJavaScriptException();
+  }
+}
+
+void add_tag_filter(
+    udev_enumerate_ptr &enumerate, const char *tag, Napi::Env &env) {
+  int r = udev_enumerate_add_match_tag(enumerate.get(), tag);
+  if (r < 0) {
+    Napi::Error::New(env, "adding tag filter failed")
+        .ThrowAsJavaScriptException();
+  }
+}
+
 Napi::Value List(const Napi::CallbackInfo &info) {
   Napi::Env env = info.Env();
   udev_ptr instance(udev_new(), &detail::unref_udev);
@@ -165,9 +183,26 @@ Napi::Value List(const Napi::CallbackInfo &info) {
   // add match etc. stuff.
   if (info[0].IsString()) {
     Napi::String subsystem = info[0].ToString();
-    udev_enumerate_add_match_subsystem(enumerate.get(),
-                                       subsystem.Utf8Value().c_str());
+    add_subsystem_filter(enumerate, subsystem.Utf8Value().c_str(), env);
+  } else if (info[0].IsObject()) {
+    Napi::Object filters = info[0].ToObject();
+    if (filters.Has("subsystems")) {
+      Napi::Array subsystems = filters.Get("subsystems").As<Napi::Array>();
+      for (uint32_t i = 0; i < subsystems.Length(); i++) {
+        Napi::String subsystem = static_cast<Napi::Value>(subsystems[i])
+          .ToString();
+        add_subsystem_filter(enumerate, subsystem.Utf8Value().c_str(), env);
+      }
+    }
+    if (filters.Has("tags")) {
+      Napi::Array tags = filters.Get("tags").As<Napi::Array>();
+      for (uint32_t i = 0; i < tags.Length(); i++) {
+        Napi::String tag = static_cast<Napi::Value>(tags[i]).ToString();
+        add_tag_filter(enumerate, tag.Utf8Value().c_str(), env);
+      }
+    }
   }
+
   udev_enumerate_scan_devices(enumerate.get());
   devices = udev_enumerate_get_list_entry(enumerate.get());
 

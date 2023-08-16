@@ -25,6 +25,9 @@ private:
   static void on_handle_event(uv_poll_t *handle, int status, int events);
   static void on_handle_close(uv_handle_t *handle);
 
+  void add_subsystem_filter(const char *subsystem, Napi::Env &env);
+  void add_tag_filter(const char *tag, Napi::Env &env);
+
   Napi::Value Close(const Napi::CallbackInfo &info);
 };
 

@@ -1,6 +1,6 @@
 {
   "name": "@antoninrousset/udev",
-  "version": "1.1.0",
+  "version": "1.2.1",
   "description": "Bindings to libudev",
   "main": "udev.js",
   "scripts": {

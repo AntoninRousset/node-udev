@@ -12,10 +12,11 @@
     },
     "sources": [ "main.cc", "udev.cc" ],
     "libraries": [
-      "-ludev",
+      "<!(pkg-config --libs libudev)"
     ],
     "include_dirs" : [
-      "<!@(node -p \"require('node-addon-api').include\")"
+      "<!@(node -p \"require('node-addon-api').include\")",
+      "<!(pkg-config --cflags libudev)"
     ],
     'dependencies': [
       "<!(node -p \"require('node-addon-api').gyp\")"
